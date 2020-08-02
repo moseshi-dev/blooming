@@ -9,7 +9,8 @@ from discord import PCMAudio
 import asyncio 
 import re
 from discord.ext import commands
-import pandas
+from typing import Dict
+from csv import DictReader, DictWriter
 import constants 
             #tokenファイル
 with open("Mintoken.txt") as f:
@@ -123,39 +124,50 @@ async def on_voice_state_update(member, before, after):
 
 #Dictionary_control
 class Dictionary_control(commands.Cog):
+    DICTIONARY_PATH = "./dictionary.csv"
+
     def __init__(self, bot):
         self.bot = bot
 
+    @classmethod
+    def load_dic(cls) -> Dict[str, str]:
+        with open(cls.DICTIONARY_PATH, encoding='utf-8') as f:
+            return {l["word"]: l["pronunciation"] for l in DictReader(f)}
+
+    @classmethod
+    def write_dic(cls, word_pronounciation_dic: Dict[str, str]) -> None:
+        with open(cls.DICTIONARY_PATH, 'w', encoding='utf-8') as f:
+            w = DictWriter(f)
+            w.writeheader()
+            w.writerows([
+                {"word": d["word"], "pronunciation": d["pronunciation"]}
+                for d in word_pronounciation_dic
+            ])
+
     @commands.command()
     async def editdic(self, ctx, arg1, arg2):
-        text = ''
-        isexist = False
-        with open('./dictionary.csv', mode='r', encoding='utf-8') as f:
-            for line in f:
-                result = re.match('(?P<from>.+),(?P<to>.+)', line)
-                if result.group('from') == arg1:
-                    text = text + result.group('from') + ',' + arg2 + '\n'
-                    isexist = True
-                    await ctx.send(arg1+'の読みを'+arg2+'に変更したよ')
-                elif result.group('from') != arg1:
-                    text = text + line
-        if not isexist:
-            await ctx.send(arg1+'は辞書に存在しないみたいだよ。辞書に追加しておくね。')
-            text = text + arg1 + ',' + arg2 + '\n'
-        with open('./dictionary.csv', mode='w', encoding='utf-8') as f:
-            f.write(text)
+        dic = self.load_dic()
+        # 辞書への追加/上書き処理は同様に dic[arg1] = arg2 でできるのでまとめる
+        if arg1 in dic:
+            msg = f"{arg1}の読みを{arg2}に変更したよ"
+        else:
+            msg = f"{arg1}は辞書に存在しないみたいだよ。辞書に追加しておくね。"
+        dic[arg1] = arg2
+        await ctx.send(msg)
+        self.write_dic(dic)
 
     @commands.command()
     async def deldic(self, ctx, arg1):
-        df = pandas.read_csv('./dictionary.csv', names=('from', 'to'), encoding='utf-8')
-        if df[df['from'] == arg1].empty:
-            await ctx.send(arg1+'は辞書に存在しないよ')
+        dic = self.load_dic()
+        if arg1 not in dic:
+            msg = f"{arg1}は辞書に存在しないよ"
+            await ctx.send(msg)
             return
-        ds = df[df['from'] != arg1]
-        df2 = pandas.DataFrame(ds)
-        df2.to_csv(index=False, header=False, encoding='utf-8')
-        df2.to_csv('./dictionary.csv', index=False, header=False, encoding='utf-8')
-        await ctx.send(arg1+'を辞書から削除したよ')
+
+        del dic[arg1]
+        self.write_dic(dic)
+        msg = f"{arg1}を辞書から削除したよ"
+        await ctx.send(msg)
 
 
 client.run(token)

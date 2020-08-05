@@ -1,8 +1,8 @@
 # 使用の準備
-constants.sample.pyをコピーし、各値を適切に書き換える。
+config.sample.tomlをコピーし、各値を適切に書き換える。
 ```console
-cp constants.sample.py constants.py
-# edit constants.py
+cp config.sample.toml config.toml
+# edit config.toml
 ```
 dictionary.sample.csvをコピーし、読み替え内容を記載する
 ```console

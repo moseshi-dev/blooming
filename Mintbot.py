@@ -6,15 +6,20 @@ import io
 import os
 from google.cloud import texttospeech
 from discord import PCMAudio
-import asyncio 
+import asyncio
 import re
 from discord.ext import commands
 from typing import Dict
 from csv import DictReader, DictWriter
-import constants 
-            #tokenファイル
-with open("Mintoken.txt") as f:
-    token = f.read()
+import toml
+
+CONFIG_PATH = "./config.toml"
+
+with open(CONFIG_PATH) as f:
+    config = toml.load(f)
+
+token = config["system"]["token"]
+
 client: Client = discord.Client()
 
 
@@ -50,13 +55,12 @@ async def say(text, voice_client):
         text = text.replace(channelresult.group(), client.get_channel(int(channelresult.group('channel'))).name)
     #メンション→ユーザーネーム、チャンネルリンク→チャンネル名、URL→"URL"、絵文字名→IDを排除
 
-
     synthesis_input = texttospeech.SynthesisInput(text=text)
     response = gcp.synthesize_speech(
         input=synthesis_input,
         voice=voice,
         audio_config=audio_config,
-    )    
+    )
     byte_reader = io.BytesIO(response.audio_content)
     source = PCMAudio(byte_reader)
     while voice_client.is_playing():
@@ -71,14 +75,22 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member):
-    readme = client.get_channel(constants.README_CH_ID)
-    ch_guide = client.get_channel(constants.CHANNEL_GUIDE_CH_ID)
-    selfintro = client.get_channel(constants.SELFINTRO_CH_ID)
-    greeting = client.get_channel(constants.GREETING_CH_ID)
+    greeting_ch_config = config["greeting"]
+    ch_ids = greeting_ch_config["channel_ids"]
+    ch_name_mention_mapping = {}
+    # moseshi: 違う気もするけど並んでるものきついものがあった
+    for ch_name, ch_id in ch_ids.items():
+        ch_name_mention_mapping[f"{ch_name}_ch_mention"] = client.get_channel(ch_id).mention
 
-    channel = client.get_channel(constants.JOIN_LOG_CH_ID) #メッセージを送信するチャンネルを定義してください
-    msg = member.mention + ' プロデューサーさん、ようこそ「MINTCORD」へ！\n まずはこのサーバのルールがあるから' + readme.mention + 'を見てね。他にも、各チャンネルの紹介があるから' + ch_guide.mention + 'を見てくれると嬉しいな。\n そのあとは、' + selfintro.mention + 'とか' + greeting.mention + 'とかで声をかけてみてね！\n これから一緒に頑張ろうね、プロデューサーさん！ '
-    await channel.send(msg)
+    join_log = client.get_channel(ch_ids["join_log"])
+
+    msg = greeting_ch_config["response_formats"]["join"].format(
+        member_mention=member.mention,
+        **ch_name_mention_mapping,
+    )
+
+    await join_log.send(msg)
+
 
 @client.event
 async def on_message(message):
@@ -86,15 +98,17 @@ async def on_message(message):
     if message.author.bot:  #メッセージ送信主がbotだった場合
         return  #処理を全部スキップ
 
-    if client.user in message.mentions and '通話来て' in message.content:
+    command_phrases = config["say"]["command_phrases"]
+    res_fmts = config["say"]["response_formats"]
+    if client.user in message.mentions and any(phrase in message.content for phrase in command_phrases["connect"]):
         voicech = message.author.voice_channel
         #voicech = message.author.voice.channel とすると複数のボイスチャンネル対応可能
         voice_client = await voicech.connect()
         tts_ch_id = message.channel.id
-        await say('通話に参加しました', voice_client)
+        await say(res_fmts["bot_connect"], voice_client)
 
-    elif client.user in message.mentions and 'おつかれ' in message.content:
-        await say('おつかれさまでした', message.guild.voice_client)
+    elif client.user in message.mentions and any(phrase in message.content for phrase in command_phrases["disconnect"]):
+        await say(res_fmts["bot_disconnect"], message.guild.voice_client)
         import time
         time.sleep(2)
         await message.guild.voice_client.disconnect()
@@ -109,18 +123,21 @@ async def on_voice_state_update(member, before, after):
     if member.bot:  #ボイチャの状態が更新されたメンバーがbotだった場合
         return  #処理を全部スキップする
 
-                            #監視するサーバーID
-    if member.channel.id == constants.SERVER_ID and (before.channel == constants.VC_GENERAL_CH_ID):
-    #before.channel.idが通話チャンネル1のチャンネルIDと同じなら聞き専1に送信する などのように変更することで複数チャンネルに対応可能
-                                           #通知させるテキストchのID
-        alert_channel = client.get_channel(constants.VC_TEXT_GENERAL_CH_ID)
-        if before.channel is None:
-            msg = member.mention + ' さんが通話に参加しました。'
-            await alert_channel.send(msg)
-        elif after.channel is None:
-            msg = member.mention + ' さんが通話から退出しました。'
-            await alert_channel.send(msg)
+    say_ch_ids = config["say"]["channel_ids"]
+    target_voice_channel = client.get_channel(say_ch_ids["voice"])
+    # 通知するテキストチャンネル
+    notification_text_ch = client.get_channel(say_ch_ids["text"])
+    res_fmts = config["say"]["response_formats"]
 
+
+    # 対象とするボイスチャンネルへの出入りがあった場合は通知
+    if before.channel is None and after.channel == target_voice_channel:
+        msg = res_fmts["member_connect"].format(member_mention=member.mention)
+        await notification_text_ch.send(msg)
+
+    if after.channel is None and before.channel == target_voice_channel:
+        msg = res_fmts["member_disconnect"].format(member_mention=member.mention)
+        await notification_text_ch.send(msg)
 
 #Dictionary_control
 class Dictionary_control(commands.Cog):
@@ -148,25 +165,28 @@ class Dictionary_control(commands.Cog):
     async def editdic(self, ctx, arg1, arg2):
         dic = self.load_dic()
         # 辞書への追加/上書き処理は同様に dic[arg1] = arg2 でできるのでまとめる
+        res_fmts = config["say"]["response_formats"]
         if arg1 in dic:
-            msg = f"{arg1}の読みを{arg2}に変更したよ"
+            msg = res_fmts["dic_edit"].format(word=arg1, pronunciation=arg2)
         else:
-            msg = f"{arg1}は辞書に存在しないみたいだよ。辞書に追加しておくね。"
+            msg = res_fmts["dic_add"].format(word=arg1)
         dic[arg1] = arg2
         await ctx.send(msg)
+
         self.write_dic(dic)
 
     @commands.command()
     async def deldic(self, ctx, arg1):
         dic = self.load_dic()
+        res_fmts = config["say"]["response_formats"]
         if arg1 not in dic:
-            msg = f"{arg1}は辞書に存在しないよ"
+            msg = res_fmts["dic_del_err"].format(word=arg1)
             await ctx.send(msg)
             return
 
         del dic[arg1]
         self.write_dic(dic)
-        msg = f"{arg1}を辞書から削除したよ"
+        msg = res_fmts["dic_del"].format(word=arg1)
         await ctx.send(msg)
 
 

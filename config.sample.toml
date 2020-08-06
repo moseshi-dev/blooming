@@ -45,3 +45,9 @@ dic_del_err = """
 {word}は辞書に存在しないよ"""
 dic_del = """
 {word}を辞書から削除したよ"""
+member_not_in_voice_channel_err = """
+{member_mention} ボイスチャンネルに接続できていないよ。
+読み上げ機能を起動する場合は、ボイスチャンネルに入ってね。"""
+bot_not_in_voice_channel_err = """
+botがボイスチャンネルに接続できていないよ。
+読み上げ機能を終了する場合は、botがボイスチャンネルに入ってる時にしてね。"""

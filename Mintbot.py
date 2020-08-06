@@ -100,21 +100,32 @@ async def on_message(message):
 
     command_phrases = config["say"]["command_phrases"]
     res_fmts = config["say"]["response_formats"]
-    if client.user in message.mentions and any(phrase in message.content for phrase in command_phrases["connect"]):
-        voicech = message.author.voice_channel
-        #voicech = message.author.voice.channel とすると複数のボイスチャンネル対応可能
-        voice_client = await voicech.connect()
-        tts_ch_id = message.channel.id
-        await say(res_fmts["bot_connect"], voice_client)
+    # bot 宛に mention 飛ばしてたらコマンド起動の確認をする
+    if client.user in message.mentions:
+        if any(phrase in message.content for phrase in command_phrases["connect"]):
+            if message.author.voice is None:
+                await message.channel.send(res_fmts["member_not_in_voice_channel_err"].format(member_mention=message.author.mention))
+                return
 
-    elif client.user in message.mentions and any(phrase in message.content for phrase in command_phrases["disconnect"]):
-        await say(res_fmts["bot_disconnect"], message.guild.voice_client)
-        import time
-        time.sleep(2)
-        await message.guild.voice_client.disconnect()
+            voicech = message.author.voice.channel
+            #voicech = message.author.voice.channel とすると複数のボイスチャンネル対応可能
+            voice_client = await voicech.connect()
+            tts_ch_id = message.channel.id
+            await say(res_fmts["bot_connect"], voice_client)
+            return
 
-    elif message.channel.id == tts_ch_id and message.guild.voice_client:
-    #elif message.channel.id == tts_ch_id and message.guild.voice_client: とするとよいでしょう
+        if any(phrase in message.content for phrase in command_phrases["disconnect"]):
+            if message.guild.voice_client is None:
+                await message.channel.send(res_fmts["bot_not_in_voice_channel_err"])
+                return
+
+            await say(res_fmts["bot_disconnect"], message.guild.voice_client)
+            time.sleep(2)
+            await message.guild.voice_client.disconnect()
+            return
+
+    if message.channel.id == tts_ch_id and message.guild.voice_client:
+        #elif message.channel.id == tts_ch_id and message.guild.voice_client: とするとよいでしょう
         await say(message.content, message.guild.voice_client)
 
 

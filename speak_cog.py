@@ -7,7 +7,7 @@ from typing import Dict, Any
 from csv import DictReader, DictWriter
 from google.cloud import texttospeech
 from discord import PCMAudio
-import time
+import asyncio
 
 class SpeakCog(commands.Cog):
     SAMPLING_RATE = 96000
@@ -94,7 +94,7 @@ class SpeakCog(commands.Cog):
 
                 vb = self.get_voice_bytes(res_fmts["bot_disconnect"])
                 await self.speak_voice_bytes(vb)
-                time.sleep(2)
+                await asyncio.sleep(2)
                 await message.guild.voice_client.disconnect()
                 return
 
@@ -157,7 +157,7 @@ class SpeakCog(commands.Cog):
     async def speak_voice_bytes(self, voice_bytes: io.BytesIO) -> None:
         source = PCMAudio(voice_bytes)
         while self.voice_client.is_playing():
-            time.sleep(1)
+            await asyncio.sleep(1)
         if self.voice_client.is_connected():
             self.voice_client.play(source)
 

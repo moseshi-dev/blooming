@@ -1,5 +1,6 @@
 [system]
 token = "12345"
+command_prefix = "!"
 
 [greeting]
 [greeting.channel_ids]
@@ -51,3 +52,6 @@ member_not_in_voice_channel_err = """
 bot_not_in_voice_channel_err = """
 botがボイスチャンネルに接続できていないよ。
 読み上げ機能を終了する場合は、botがボイスチャンネルに入ってる時にしてね。"""
+already_in_voice_channel_err = """
+{member_mention} botは既にチャンネルに接続済みだよ。
+:loud_sound: {voice_ch_name}"""

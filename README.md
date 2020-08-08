@@ -10,7 +10,7 @@ cp dictionary.sample.csv dictionary.csv
 # 例
 echo "読み方,よみかた" >> dictionary.csv
 ```
-依存ライブラリをインストールし、環境変数を設定した上で、起動。
+依存ライブラリをインストールし、起動。
 ```console
 pip install -r requirements.txt
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/google/credential/json/path

@@ -96,6 +96,7 @@ class SpeakCog(commands.Cog):
                 await self.speak_voice_bytes(vb)
                 await asyncio.sleep(2)
                 await message.guild.voice_client.disconnect()
+                self.voice_client = None
                 return
 
         if message.channel == self.tts_ch and message.guild.voice_client:
@@ -110,19 +111,29 @@ class SpeakCog(commands.Cog):
         if member.bot:  #ボイチャの状態が更新されたメンバーがbotだった場合
             return  #処理を全部スキップする
 
-        ch_ids = config["channel_ids"]
-        target_voice_channel = self.bot.get_channel(ch_ids["voice"])
+        voice_client = member.guild.voice_client
+        # 接続されていないのであれば以後の処理をスキップ
+        if voice_client is None or not voice_client.is_connected():
+            return
+
+        target_voice_channel = voice_client.channel
         # 通知するテキストチャンネル
-        notification_text_ch = self.bot.get_channel(ch_ids["text"])
+        notification_text_ch = self.bot.get_channel(config["channel_ids"]["notification"])
         res_fmts = config["response_formats"]
 
         # 対象とするボイスチャンネルへの出入りがあった場合は通知
         if before.channel is None and after.channel == target_voice_channel:
-            msg = res_fmts["member_connect"].format(member_mention=member.mention)
+            msg = res_fmts["member_connect"].format(
+                member_mention=member.mention,
+                voice_ch_name=target_voice_channel.name,
+            )
             await notification_text_ch.send(msg)
 
         if after.channel is None and before.channel == target_voice_channel:
-            msg = res_fmts["member_disconnect"].format(member_mention=member.mention)
+            msg = res_fmts["member_disconnect"].format(
+                member_mention=member.mention,
+                voice_ch_name=target_voice_channel.name,
+            )
             await notification_text_ch.send(msg)
 
     def preprocess_text(self, text: str) -> str:
@@ -132,14 +143,14 @@ class SpeakCog(commands.Cog):
         text = re.sub(r'http(s)?://[^\s]+', 'URL', text)
         text = text.replace('<:', '')
         text = re.sub(r':[0-9]*>', '', text)
-        while re.search('<@\d+>', text):
-            nameresult = re.search('<@(?P<name>\d+)>', text)
+        while re.search(r'<@\d+>', text):
+            nameresult = re.search(r'<@(?P<name>\d+)>', text)
             text = text.replace(nameresult.group(), self.bot.get_user(int(nameresult.group('name'))).name)
-        while re.search('<@!\d+>', text):
-            nameresult = re.search('<@!(?P<name>\d+)>', text)
+        while re.search(r'<@!\d+>', text):
+            nameresult = re.search(r'<@!(?P<name>\d+)>', text)
             text = text.replace(nameresult.group(), self.bot.get_user(int(nameresult.group('name'))).name)
-        while re.search('<#\d+>', text):
-            channelresult = re.search('<#(?P<channel>\d+)>', text)
+        while re.search(r'<#\d+>', text):
+            channelresult = re.search(r'<#(?P<channel>\d+)>', text)
             text = text.replace(channelresult.group(), self.bot.get_channel(int(channelresult.group('channel'))).name)
         for w, p in self.dic.items():
             text = text.replace(w, p)
@@ -156,9 +167,15 @@ class SpeakCog(commands.Cog):
 
     async def speak_voice_bytes(self, voice_bytes: io.BytesIO) -> None:
         source = PCMAudio(voice_bytes)
-        while self.voice_client.is_playing():
+        voice_client = self.voice_client
+        # VC接続されていないならスキップ
+        if voice_client is None:
+            return
+
+        while voice_client.is_playing():
             await asyncio.sleep(1)
-        if self.voice_client.is_connected():
+
+        if self.voice_client is not None and self.voice_client.is_connected():
             self.voice_client.play(source)
 
     @commands.command()

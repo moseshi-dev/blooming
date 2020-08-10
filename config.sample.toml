@@ -20,8 +20,7 @@ join = """
 
 [say]
 [say.channel_ids]
-text = 1234
-voice = 1234
+notification = 1234
 [say.command_phrases]
 connect = [
     "通話来て",
@@ -31,9 +30,9 @@ disconnect = [
 ]
 [say.response_formats]
 member_connect = """
-{member_mention}さんが通話に参加しました。"""
+{member_mention}さんが :loud_sound:{voice_ch_name}の通話に参加しました。"""
 member_disconnect = """
-{member_mention}さんが通話から退出しました。"""
+{member_mention}さんが :loud_sound:{voice_ch_name}の通話から退出しました。"""
 bot_connect = """
 通話に参加しました"""
 bot_disconnect = """

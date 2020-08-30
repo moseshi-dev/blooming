@@ -1,0 +1,56 @@
+[system]
+token = "12345"
+command_prefix = "!"
+
+[greeting]
+[greeting.channel_ids]
+readme = 1234
+guide = 1234
+self_intro = 1234
+greeting = 1234
+join_log = 1234
+[greeting.response_formats]
+join = """
+{member_mention} プロデューサーさん、ようこそ「MINTCORD」へ！
+まずはこのサーバのルールがあるから{readme_ch_mention}を見てね。\
+他にも、各チャンネルの紹介があるから{guide_ch_mention}を見てくれると嬉しいな。
+そのあとは、{self_intro_ch_mention}とか\
+{greeting_ch_mention}とかで声をかけてみてね！
+これから一緒に頑張ろうね、プロデューサーさん！"""
+
+[say]
+[say.channel_ids]
+notification = 1234
+[say.command_phrases]
+connect = [
+    "通話来て",
+]
+disconnect = [
+    "おつかれ",
+]
+[say.response_formats]
+member_connect = """
+{member_mention}さんが :loud_sound:{voice_ch_name}の通話に参加しました。"""
+member_disconnect = """
+{member_mention}さんが :loud_sound:{voice_ch_name}の通話から退出しました。"""
+bot_connect = """
+通話に参加しました"""
+bot_disconnect = """
+おつかれさまでした"""
+dic_edit = """
+{word}の読みを{pronunciation}に変更したよ"""
+dic_add = """
+{word}は辞書に存在しないみたいだよ。辞書に追加しておくね。"""
+dic_del_err = """
+{word}は辞書に存在しないよ"""
+dic_del = """
+{word}を辞書から削除したよ"""
+member_not_in_voice_channel_err = """
+{member_mention} ボイスチャンネルに接続できていないよ。
+読み上げ機能を起動する場合は、ボイスチャンネルに入ってね。"""
+bot_not_in_voice_channel_err = """
+botがボイスチャンネルに接続できていないよ。
+読み上げ機能を終了する場合は、botがボイスチャンネルに入ってる時にしてね。"""
+already_in_voice_channel_err = """
+{member_mention} botは既にチャンネルに接続済みだよ。
+:loud_sound: {voice_ch_name}"""

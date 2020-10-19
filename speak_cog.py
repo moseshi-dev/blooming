@@ -2,7 +2,7 @@ import io
 import re
 
 from discord.ext import commands
-from discord.ext.commands import Bot
+from discord.ext.commands import Bot, Context
 from typing import Dict, Any
 from csv import DictReader, DictWriter
 from google.cloud import texttospeech
@@ -31,6 +31,33 @@ class SpeakCog(commands.Cog):
         self.bot = bot
         self.tts_ch = None
 
+    @commands.command()
+    async def start_read(self, ctx: Context):
+        config = self.config
+        res_fmts = config["response_formats"]
+        message = ctx.message
+        # ユーザがVCに接続してなかったらエラー
+        if message.author.voice is None:
+            msg = res_fmts["member_not_in_voice_channel_err"].format(
+                member_mention=message.author.mention,
+            )
+            await message.channel.send(msg)
+            return
+        voice_client = message.guild.voice_client
+        if voice_client is not None:
+            msg = res_fmts["already_in_voice_channel_err"].format(
+                member_mention=message.author.mention,
+                voice_ch_name=voice_client.channel.name,
+            )
+            await message.channel.send(msg)
+            return
+
+        voicech = message.author.voice.channel
+        self.voice_client = await voicech.connect()
+        self.tts_ch = message.channel
+        vb = self.get_voice_bytes(res_fmts["bot_connect"])
+        await self.speak_voice_bytes(vb)
+       
     @classmethod
     def load_dic(cls) -> Dict[str, str]:
         with open(cls.DICTIONARY_PATH, encoding=cls.DICTIONARY_ENCODING) as f:
